@@ -176,15 +176,46 @@ class PersonDB {
         where: 'ID = ?',
         whereArgs: [person.id],
       );
-      if (deletedCount == 1){
+      if (deletedCount == 1) {
+        //making sure one row is deleted
         _persons.remove(person);
+        _streamController.add(_persons);
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print('Deletion failed with error $e');
+      return false;
+    }
+  }
+
+  Future<bool> update(Person person) async {
+    final db = _db;
+    if (db == null) {
+      return false;
+    }
+    try {
+      final updateCount = await db.update(
+        'PEOPLE',
+        {
+          'FIRST_NAME': person.firstName,
+          'LAST_NAME': person.firstName,
+        },
+        where: 'ID = ?',
+        whereArgs: [person.id],
+      );
+
+      if(updateCount == 1){
+        _persons.removeWhere((other) => other.id == person.id);
+        _persons.add(person);
         _streamController.add(_persons);
         return true;
       }else{
         return false;
       }
     } catch (e) {
-      print('Deletion failed with error $e');
+      print('Failed to update item error = $e');
       return false;
     }
   }
@@ -258,6 +289,15 @@ class _MyHomePageState extends State<MyHomePage> {
                         itemBuilder: (context, index) {
                           final person = people[index];
                           return ListTile(
+                            onTap: () async {
+                              final editedPerson = await showUpdateDialog(
+                                context,
+                                person,
+                              );
+                              if (editedPerson != null) {
+                                await _crudStorage.update(editedPerson);
+                              }
+                            },
                             title: Text(person.fullName),
                             subtitle: Text('ID : ${person.id}'),
                             trailing: TextButton(
@@ -315,6 +355,56 @@ Future<bool> showDeleteDialog(BuildContext context) {
       return value;
     } else {
       return false;
+    }
+  });
+}
+
+final _firstNameController = TextEditingController();
+final _lastNameController = TextEditingController();
+Future<Person?> showUpdateDialog(BuildContext context, Person person) {
+  _firstNameController.text = person.firstName;
+  _lastNameController.text = person.lastName;
+  return showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Enter your updated values here:'),
+            TextField(
+              controller: _firstNameController,
+            ),
+            TextField(
+              controller: _lastNameController,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(null);
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final editedPerson = Person(
+                  id: person.id,
+                  firstName: _firstNameController.text,
+                  lastName: _lastNameController.text);
+              Navigator.of(context).pop(editedPerson);
+            },
+            child: Text('Save'),
+          ),
+        ],
+      );
+    },
+  ).then((value) {
+    if (value is Person) {
+      return value;
+    } else {
+      return null;
     }
   });
 }
